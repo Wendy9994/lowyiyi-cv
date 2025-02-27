@@ -35,7 +35,7 @@ class AdminController extends Controller
         $user = User::where('username', $credentials['username'])->first();
 
         if ($user && Hash::check($credentials['password'], $user->password)) {
-            session(['admin' => true, 'admin_id' => $user->id]); // Store user ID
+            session(['admin' => true, 'admin_id' => $user->_id]); // Use MongoDB Object ID
             return redirect()->route('admin.dashboard');
         }
 
@@ -49,7 +49,7 @@ class AdminController extends Controller
             return redirect('/admin')->withErrors(['message' => 'Please log in first.']);
         }
 
-        // Fetch profile data from the database
+        // Fetch profile data from MongoDB
         $profile = Profile::first() ?? new Profile([
             'name' => 'Not Available',
             'email' => 'Not Available',
@@ -99,5 +99,4 @@ class AdminController extends Controller
 
         return redirect()->route('admin.login')->with('success', 'Admin registered successfully. Please log in.');
     }
-
 }

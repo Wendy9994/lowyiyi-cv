@@ -3,15 +3,23 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Language;
+use Kreait\Firebase\Factory;
+use Kreait\Firebase\ServiceAccount;
 
 class LanguageController extends Controller
 {
+    private $firestore;
+
+    public function __construct()
+    {
+        $factory = (new Factory)->withServiceAccount(config('firebase.credentials'));
+        $this->firestore = $factory->createFirestore()->database();
+    }
+
     public function index()
     {
-        return view('admin.languages.index', [
-            'languages' => Language::all()
-        ]);
+        $languages = $this->firestore->collection('languages')->documents();
+        return view('admin.languages.index', compact('languages'));
     }
 
     public function create()
@@ -26,7 +34,7 @@ class LanguageController extends Controller
             'proficiency' => 'required|in:Beginner,Intermediate,Advanced,Fluent,Native',
         ]);
 
-        Language::create([
+        $this->firestore->collection('languages')->add([
             'name' => $request->name,
             'proficiency' => $request->proficiency,
         ]);
@@ -36,8 +44,13 @@ class LanguageController extends Controller
 
     public function edit($id)
     {
-        $language = Language::where('_id', $id)->firstOrFail();
-        return view('admin.languages.edit', compact('language'));
+        $language = $this->firestore->collection('languages')->document($id)->snapshot();
+
+        if (!$language->exists()) {
+            return redirect()->route('languages.index')->with('error', 'Language not found.');
+        }
+
+        return view('admin.languages.edit', ['language' => $language->data(), 'id' => $id]);
     }
 
     public function update(Request $request, $id)
@@ -47,24 +60,29 @@ class LanguageController extends Controller
             'proficiency' => 'required|in:Beginner,Intermediate,Advanced,Fluent,Native',
         ]);
 
-        $language = Language::where('_id', $id)->firstOrFail();
-        $language->update([
+        $languageRef = $this->firestore->collection('languages')->document($id);
+        $languageRef->set([
             'name' => $request->name,
             'proficiency' => $request->proficiency,
-        ]);
+        ], ['merge' => true]);
 
         return redirect()->route('languages.index')->with('success', 'Language updated successfully.');
     }
 
     public function destroy($id)
     {
-        Language::where('_id', $id)->delete();
+        $this->firestore->collection('languages')->document($id)->delete();
         return redirect()->route('languages.index')->with('success', 'Language deleted successfully.');
     }
 
     public function view($id)
     {
-        $language = Language::where('_id', $id)->firstOrFail();
-        return view('admin.languages.view', compact('language'));
+        $language = $this->firestore->collection('languages')->document($id)->snapshot();
+
+        if (!$language->exists()) {
+            return redirect()->route('languages.index')->with('error', 'Language not found.');
+        }
+
+        return view('admin.languages.view', ['language' => $language->data()]);
     }
 }

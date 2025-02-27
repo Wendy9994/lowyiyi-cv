@@ -1,0 +1,14 @@
+
+.demo-banner {
+    background: #38AEEA;
+}
+a.demo-btn-on-bg, .demo-btn-on-bg {
+    background: rgba(0, 0, 0, 0.2);
+    color: #fff;
+    border: none;
+}
+a.demo-btn-on-bg:hover, a.demo-btn-on-bg:focus, a.demo-btn-on-bg:active, .demo-btn-on-bg:hover, .demo-btn-on-bg:focus, .demo-btn-on-bg:active {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: transparent;
+    border: none;
+}

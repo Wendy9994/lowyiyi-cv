@@ -3,15 +3,25 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Education;
+use Kreait\Firebase\Factory;
+use Kreait\Firebase\Database;
 
 class EducationController extends Controller
 {
+    protected $database;
+    protected $educationRef;
+
+    public function __construct()
+    {
+        $factory = (new Factory)->withServiceAccount(config('firebase.credentials'));
+        $this->database = $factory->createDatabase();
+        $this->educationRef = $this->database->getReference('education'); // Reference to "education" collection
+    }
+
     public function index()
     {
-        return view('admin.education.index', [
-            'education' => Education::all()
-        ]);
+        $education = $this->educationRef->getValue() ?? []; // Get all education records
+        return view('admin.education.index', compact('education'));
     }
 
     public function create()
@@ -19,70 +29,73 @@ class EducationController extends Controller
         return view('admin.education.create');
     }
 
-    
     public function store(Request $request)
-{
-    // Validate input
-    $validatedData = $request->validate([
-        'institution' => 'required',
-        'degree' => 'required',
-        'cgpa' => 'nullable|numeric',
-        'start_date' => 'required|date',
-        'end_date' => 'nullable|date',
-    ]);
-
-    // Try saving data manually
-    $education = new Education();
-    $education->institution = $request->institution;
-    $education->degree = $request->degree;
-    $education->cgpa = $request->cgpa;
-    $education->start_date = $request->start_date;
-    $education->end_date = $request->end_date;
-    
-    $saved = $education->save(); // Save the record
-
-    return redirect('/education')->with('success', 'Education added successfully.');
-
-}
-
-
-    public function edit(Education $education)
     {
-        return view('admin.education.edit', compact('education'));
+        // Validate input
+        $request->validate([
+            'institution' => 'required',
+            'degree' => 'required',
+            'cgpa' => 'nullable|numeric',
+            'start_date' => 'required|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        // Create new education record
+        $newEducation = [
+            'institution' => $request->input('institution'),
+            'degree' => $request->input('degree'),
+            'cgpa' => $request->input('cgpa'),
+            'start_date' => $request->input('start_date'),
+            'end_date' => $request->input('end_date'),
+            'created_at' => now()->toDateTimeString()
+        ];
+
+        $this->educationRef->push($newEducation); // Firebase push()
+
+        return redirect()->route('education.index')->with('success', 'Education added successfully.');
     }
 
-    public function update(Request $request, Education $education)
-{
-    // Validate input
-    $request->validate([
-        'institution' => 'required|string|max:255',
-        'degree' => 'required|string|max:255',
-        'cgpa' => 'nullable|string|max:255',
-        'start_date' => 'required|date',
-        'end_date' => 'nullable|date|after_or_equal:start_date',
-    ]);
-
-    // Update the record
-    $education->update([
-        'institution' => $request->institution,
-        'degree' => $request->degree,
-        'cgpa' => $request->cgpa,
-        'start_date' => $request->start_date,
-        'end_date' => $request->end_date,
-    ]);
-
-    return redirect()->route('education.index')->with('success', 'Education updated successfully!');
-}
-
-    public function destroy(Education $education)
+    public function edit($id)
     {
-        $education->delete();
+        $education = $this->educationRef->getChild($id)->getValue(); // Fetch education by ID
+        return view('admin.education.edit', compact('education', 'id'));
+    }
+
+    public function update(Request $request, $id)
+    {
+        // Validate input
+        $request->validate([
+            'institution' => 'required|string|max:255',
+            'degree' => 'required|string|max:255',
+            'cgpa' => 'nullable|string|max:255',
+            'start_date' => 'required|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+
+        // Updated education record
+        $updatedEducation = [
+            'institution' => $request->input('institution'),
+            'degree' => $request->input('degree'),
+            'cgpa' => $request->input('cgpa'),
+            'start_date' => $request->input('start_date'),
+            'end_date' => $request->input('end_date'),
+            'updated_at' => now()->toDateTimeString()
+        ];
+
+        $this->educationRef->getChild($id)->update($updatedEducation); // Update in Firebase
+
+        return redirect()->route('education.index')->with('success', 'Education updated successfully!');
+    }
+
+    public function destroy($id)
+    {
+        $this->educationRef->getChild($id)->remove(); // Delete from Firebase
         return redirect()->route('education.index')->with('success', 'Education deleted successfully.');
     }
 
     public function view($id)
     {
-        $education = Education::findOrFail($id); // Fetch skill by ID
+        $education = $this->educationRef->getChild($id)->getValue(); // Get education by ID
         return view('admin.education.view', compact('education'));
     }
 }

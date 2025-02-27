@@ -46,14 +46,20 @@ class ProfileController extends Controller
         ]);
 
         $profile = Profile::first();
-        $profile->update($request->all());
+        $profile->update([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'location' => $request->location,
+            'profile' => $request->profile,
+        ]);
 
         return redirect()->route('profile.edit')->with('success', 'Profile updated successfully.');
     }
 
     public function view($id)
     {
-        $profile = Profile::findOrFail($id); // Fetch skill by ID
+        $profile = Profile::where('_id', $id)->firstOrFail();
         return view('admin.profile.view', compact('profile'));
     }
 }

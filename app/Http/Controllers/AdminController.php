@@ -75,5 +75,29 @@ class AdminController extends Controller
         session()->forget('admin'); // Remove admin session
         session()->flush(); // Clear all session data
         return redirect('/admin')->with('success', 'Logged out successfully.');
-    }       
+    } 
+    
+    public function register()
+    {   
+        if (session()->has('admin')) {
+            return redirect()->route('admin.dashboard');
+        }
+        return view('admin.register');
+    }
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'username' => 'required|unique:users',
+            'password' => 'required|min:6',
+        ]);
+
+        $user = User::create([
+            'username' => $request->username,
+            'password' => Hash::make($request->password),
+        ]);
+
+        return redirect()->route('admin.login')->with('success', 'Admin registered successfully. Please log in.');
+    }
+
 }

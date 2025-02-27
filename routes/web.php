@@ -26,6 +26,10 @@ Route::get('/', [ProfileController::class, 'index'])->name('cv.public');
 Route::get('/admin', [AdminController::class, 'login'])->name('admin.login');
 Route::post('/admin', [AdminController::class, 'authenticate'])->name('admin.authenticate');
 
+//Admin Register
+Route::get('/admin/register', [AdminController::class, 'register'])->name('admin.register');
+Route::post('/admin/register', [AdminController::class, 'store'])->name('admin.store');
+
 // Protect Admin Dashboard with Middleware
     Route::middleware(['admin'])->group(function () {
     Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');

@@ -9,7 +9,7 @@ class AdminAuth
 {
     public function handle(Request $request, Closure $next)
     {
-        if (!Session::has('admin_logged_in')) {
+        if (!Session::has('admin_id')) {
             return redirect('/admin/login')->with('error', 'You must log in first.');
         }
 

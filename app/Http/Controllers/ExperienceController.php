@@ -3,15 +3,23 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Experience;
+use Kreait\Firebase\Factory;
+use Kreait\Firebase\ServiceAccount;
 
 class ExperienceController extends Controller
 {
+    private $firestore;
+
+    public function __construct()
+    {
+        $factory = (new Factory)->withServiceAccount(config('firebase.credentials'));
+        $this->firestore = $factory->createFirestore()->database();
+    }
+
     public function index()
     {
-        return view('admin.experiences.index', [
-            'experiences' => Experience::all()
-        ]);
+        $experiences = $this->firestore->collection('experiences')->documents();
+        return view('admin.experiences.index', compact('experiences'));
     }
 
     public function create()
@@ -29,7 +37,7 @@ class ExperienceController extends Controller
             'end_date' => 'nullable|date',
         ]);
 
-        Experience::create([
+        $this->firestore->collection('experiences')->add([
             'title' => $request->title,
             'type' => $request->type,
             'description' => $request->description,
@@ -42,8 +50,13 @@ class ExperienceController extends Controller
 
     public function edit($id)
     {
-        $experience = Experience::where('_id', $id)->firstOrFail();
-        return view('admin.experiences.edit', compact('experience'));
+        $experience = $this->firestore->collection('experiences')->document($id)->snapshot();
+
+        if (!$experience->exists()) {
+            return redirect()->route('experiences.index')->with('error', 'Experience not found.');
+        }
+
+        return view('admin.experiences.edit', ['experience' => $experience->data(), 'id' => $id]);
     }
 
     public function update(Request $request, $id)
@@ -54,27 +67,32 @@ class ExperienceController extends Controller
             'end_date' => 'nullable|date',
         ]);
 
-        $experience = Experience::where('_id', $id)->firstOrFail();
-        $experience->update([
+        $experienceRef = $this->firestore->collection('experiences')->document($id);
+        $experienceRef->set([
             'title' => $request->title,
             'type' => $request->type,
             'description' => $request->description,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
-        ]);
+        ], ['merge' => true]);
 
         return redirect()->route('experiences.index')->with('success', 'Experience updated successfully.');
     }
 
     public function destroy($id)
     {
-        Experience::where('_id', $id)->delete();
+        $this->firestore->collection('experiences')->document($id)->delete();
         return redirect()->route('experiences.index')->with('success', 'Experience deleted successfully.');
     }
 
     public function view($id)
     {
-        $experience = Experience::where('_id', $id)->firstOrFail();
-        return view('admin.experiences.view', compact('experience'));
+        $experience = $this->firestore->collection('experiences')->document($id)->snapshot();
+
+        if (!$experience->exists()) {
+            return redirect()->route('experiences.index')->with('error', 'Experience not found.');
+        }
+
+        return view('admin.experiences.view', ['experience' => $experience->data()]);
     }
 }

@@ -3,15 +3,29 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Skill;
+use Kreait\Firebase\Factory;
+use Kreait\Firebase\ServiceAccount;
 
 class SkillController extends Controller
 {
+    private $firestore;
+
+    public function __construct()
+    {
+        $factory = (new Factory)->withServiceAccount(config('firebase.credentials'));
+        $this->firestore = $factory->createFirestore()->database();
+    }
+
     public function index()
     {
-        return view('admin.skills.index', [
-            'skills' => Skill::all()
-        ]);
+        $skillsRef = $this->firestore->collection('skills')->documents();
+        $skills = [];
+
+        foreach ($skillsRef as $doc) {
+            $skills[] = array_merge(['id' => $doc->id()], $doc->data());
+        }
+
+        return view('admin.skills.index', compact('skills'));
     }
 
     public function create()
@@ -27,17 +41,29 @@ class SkillController extends Controller
             'proficiency' => 'required|integer|min:1|max:100',
         ]);
 
-        Skill::create($request->all());
+        $this->firestore->collection('skills')->add([
+            'category' => $request->category,
+            'name' => $request->name,
+            'proficiency' => $request->proficiency,
+        ]);
 
         return redirect()->route('skills.index')->with('success', 'Skill added successfully.');
     }
 
-    public function edit(Skill $skill)
+    public function edit($id)
     {
+        $doc = $this->firestore->collection('skills')->document($id)->snapshot();
+
+        if (!$doc->exists()) {
+            return redirect()->route('skills.index')->with('error', 'Skill not found.');
+        }
+
+        $skill = array_merge(['id' => $doc->id()], $doc->data());
+
         return view('admin.skills.edit', compact('skill'));
     }
 
-    public function update(Request $request, Skill $skill)
+    public function update(Request $request, $id)
     {
         $request->validate([
             'category' => 'required',
@@ -45,21 +71,31 @@ class SkillController extends Controller
             'proficiency' => 'required|integer|min:1|max:100',
         ]);
 
-        $skill->update($request->all());
+        $this->firestore->collection('skills')->document($id)->set([
+            'category' => $request->category,
+            'name' => $request->name,
+            'proficiency' => $request->proficiency,
+        ], ['merge' => true]);
 
         return redirect()->route('skills.index')->with('success', 'Skill updated successfully.');
     }
 
-    public function destroy(Skill $skill)
+    public function destroy($id)
     {
-        $skill->delete();
+        $this->firestore->collection('skills')->document($id)->delete();
         return redirect()->route('skills.index')->with('success', 'Skill deleted successfully.');
     }
 
     public function view($id)
     {
-        $skill = Skill::findOrFail($id); // Fetch skill by ID
+        $doc = $this->firestore->collection('skills')->document($id)->snapshot();
+
+        if (!$doc->exists()) {
+            return redirect()->route('skills.index')->with('error', 'Skill not found.');
+        }
+
+        $skill = array_merge(['id' => $doc->id()], $doc->data());
+
         return view('admin.skills.view', compact('skill'));
     }
-
 }

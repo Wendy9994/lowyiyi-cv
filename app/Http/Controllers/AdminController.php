@@ -4,18 +4,22 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use App\Models\User;
-use App\Models\Profile;
-use App\Models\Education;
-use App\Models\Experience;
-use App\Models\Award;
-use App\Models\Skill;
-use App\Models\Reference;
-use App\Models\Language;
+use Kreait\Firebase\Factory;
+use Kreait\Firebase\Database;
 
 class AdminController extends Controller
 {
-    // Show Admin Login Page (Redirect if already logged in)
+    protected $database;
+    protected $adminRef;
+
+    public function __construct()
+    {
+        $factory = (new Factory)->withServiceAccount(config('firebase.credentials'));
+        $this->database = $factory->createDatabase();
+        $this->adminRef = $this->database->getReference('admins'); // Firebase "admins" node
+    }
+
+    // Show Admin Login Page
     public function login()
     {
         if (session()->has('admin')) {
@@ -24,7 +28,7 @@ class AdminController extends Controller
         return view('admin.login');
     }
 
-    // Admin Authentication
+    // Admin Authentication (Login)
     public function authenticate(Request $request)
     {
         $credentials = $request->validate([
@@ -32,59 +36,49 @@ class AdminController extends Controller
             'password' => 'required',
         ]);
 
-        $user = User::where('username', $credentials['username'])->first();
-
-        if ($user && Hash::check($credentials['password'], $user->password)) {
-            session(['admin' => true, 'admin_id' => $user->_id]); // Use MongoDB Object ID
-            return redirect()->route('admin.dashboard');
+        $admins = $this->adminRef->getValue() ?? [];
+        
+        foreach ($admins as $id => $admin) {
+            if ($admin['username'] === $credentials['username'] && Hash::check($credentials['password'], $admin['password'])) {
+                session(['admin' => true, 'admin_id' => $id]); // Store admin session
+                return redirect()->route('admin.dashboard');
+            }
         }
 
         return back()->withErrors(['message' => 'Invalid login details.']);
     }
 
-    // Admin Dashboard (Session Check)
+    // Admin Dashboard
     public function dashboard()
     {
         if (!session()->has('admin')) {
             return redirect('/admin')->withErrors(['message' => 'Please log in first.']);
         }
 
-        // Fetch profile data from MongoDB
-        $profile = Profile::first() ?? new Profile([
-            'name' => 'Not Available',
-            'email' => 'Not Available',
-            'phone' => 'Not Available',
-            'location' => 'Not Available',
-            'profile' => 'No Profile Information Available',
-        ]);
+        $adminId = session('admin_id');
+        $profile = $this->adminRef->getChild($adminId)->getValue() ?? [];
 
-        return view('admin.dashboard', [
-            'profile' => $profile,
-            'education' => Education::all(),
-            'experience' => Experience::all(),
-            'awards' => Award::all(),
-            'skills' => Skill::all(),
-            'references' => Reference::all(),
-            'languages' => Language::all(),
-        ]);
+        return view('admin.dashboard', compact('profile'));
     }
 
     // Admin Logout
     public function logout()
     {
-        session()->forget('admin'); // Remove admin session
-        session()->flush(); // Clear all session data
+        session()->forget('admin');
+        session()->flush();
         return redirect('/admin')->with('success', 'Logged out successfully.');
-    } 
-    
+    }
+
+    // Show Admin Registration Page
     public function register()
-    {   
+    {
         if (session()->has('admin')) {
             return redirect()->route('admin.dashboard');
         }
         return view('admin.register');
     }
 
+    // Store New Admin in Firebase
     public function store(Request $request)
     {
         $request->validate([
@@ -92,10 +86,12 @@ class AdminController extends Controller
             'password' => 'required|min:6',
         ]);
 
-        $user = User::create([
+        $newAdmin = [
             'username' => $request->username,
             'password' => Hash::make($request->password),
-        ]);
+        ];
+
+        $this->adminRef->push($newAdmin); // Add admin to Firebase
 
         return redirect()->route('admin.login')->with('success', 'Admin registered successfully. Please log in.');
     }

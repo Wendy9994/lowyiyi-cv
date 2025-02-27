@@ -26,37 +26,45 @@ class LanguageController extends Controller
             'proficiency' => 'required|in:Beginner,Intermediate,Advanced,Fluent,Native',
         ]);
 
-        Language::create($request->all());
+        Language::create([
+            'name' => $request->name,
+            'proficiency' => $request->proficiency,
+        ]);
 
         return redirect()->route('languages.index')->with('success', 'Language added successfully.');
     }
 
-    public function edit(Language $language)
+    public function edit($id)
     {
+        $language = Language::where('_id', $id)->firstOrFail();
         return view('admin.languages.edit', compact('language'));
     }
 
-    public function update(Request $request, Language $language)
+    public function update(Request $request, $id)
     {
         $request->validate([
             'name' => 'required',
             'proficiency' => 'required|in:Beginner,Intermediate,Advanced,Fluent,Native',
         ]);
-        
-        $language->update($request->all());
+
+        $language = Language::where('_id', $id)->firstOrFail();
+        $language->update([
+            'name' => $request->name,
+            'proficiency' => $request->proficiency,
+        ]);
 
         return redirect()->route('languages.index')->with('success', 'Language updated successfully.');
     }
 
-    public function destroy(Language $language)
+    public function destroy($id)
     {
-        $language->delete();
+        Language::where('_id', $id)->delete();
         return redirect()->route('languages.index')->with('success', 'Language deleted successfully.');
     }
 
     public function view($id)
     {
-        $language = Language::findOrFail($id); // Fetch skill by ID
+        $language = Language::where('_id', $id)->firstOrFail();
         return view('admin.languages.view', compact('language'));
     }
 }

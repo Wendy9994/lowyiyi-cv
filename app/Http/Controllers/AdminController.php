@@ -37,10 +37,21 @@ class AdminController extends Controller
         ]);
 
         $admins = $this->adminRef->getValue() ?? [];
-        
+
+        if (!$admins) {
+            return back()->withErrors(['message' => 'Invalid login details.']);
+        }
+
         foreach ($admins as $id => $admin) {
-            if ($admin['username'] === $credentials['username'] && Hash::check($credentials['password'], $admin['password'])) {
-                session(['admin' => true, 'admin_id' => $id]); // Store admin session
+            if (isset($admin['username'], $admin['password']) &&
+                $admin['username'] === $credentials['username'] &&
+                Hash::check($credentials['password'], $admin['password'])) {
+                
+                session([
+                    'admin' => $admin, 
+                    'admin_id' => $id
+                ]);
+
                 return redirect()->route('admin.dashboard');
             }
         }
@@ -56,7 +67,11 @@ class AdminController extends Controller
         }
 
         $adminId = session('admin_id');
-        $profile = $this->adminRef->getChild($adminId)->getValue() ?? [];
+        $profile = $this->adminRef->getChild($adminId)->getValue();
+
+        if (!$profile) {
+            return redirect('/admin')->withErrors(['message' => 'Admin profile not found.']);
+        }
 
         return view('admin.dashboard', compact('profile'));
     }
@@ -64,7 +79,6 @@ class AdminController extends Controller
     // Admin Logout
     public function logout()
     {
-        session()->forget('admin');
         session()->flush();
         return redirect('/admin')->with('success', 'Logged out successfully.');
     }
@@ -82,9 +96,18 @@ class AdminController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'username' => 'required|unique:users',
+            'username' => 'required',
             'password' => 'required|min:6',
         ]);
+
+        // Check if username already exists
+        $admins = $this->adminRef->getValue() ?? [];
+
+        foreach ($admins as $admin) {
+            if (isset($admin['username']) && $admin['username'] === $request->username) {
+                return back()->withErrors(['message' => 'Username already exists.']);
+            }
+        }
 
         $newAdmin = [
             'username' => $request->username,
